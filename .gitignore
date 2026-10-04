@@ -1,0 +1,6 @@
+.libs/
+*.la
+*.lo
+*.slo
+*.o
+tests/test_crypto
