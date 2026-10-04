@@ -743,7 +743,7 @@ ps_register_hooks(apr_pool_t *p)
     ap_hook_insert_filter(ps_insert_filter, NULL, NULL, APR_HOOK_MIDDLE);
 }
 
-AP_DECLARE_MODULE(payloadshield) = {
+module AP_MODULE_DECLARE_DATA payloadshield_module = {
     STANDARD20_MODULE_STUFF,
     ps_create_dir_conf,
     ps_merge_dir_conf,
