@@ -11,7 +11,7 @@ mod_payloadshield.la: $(SOURCES) $(wildcard include/*.h crypto/*.h)
 	$(APXS) -c -Wc,-Wall -Iinclude -Icrypto -lcrypto -o mod_payloadshield.la $(SOURCES)
 
 install: all
-	$(APXS) -i mod_payloadshield.la
+	$(APXS) -i -n payloadshield mod_payloadshield.la
 
 test:
 	$(MAKE) -C tests test
