@@ -4,3 +4,4 @@
 *.slo
 *.o
 tests/test_crypto
+deploy.*
