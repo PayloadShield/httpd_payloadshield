@@ -1,0 +1,49 @@
+name: docker-build-test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.set.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        run: echo "versions=$(jq -c . docker/httpd-versions.json)" >> "$GITHUB_OUTPUT"
+
+  build-test:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        httpd_version: ${{ fromJson(needs.matrix.outputs.versions) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and test (crypto unit tests run in the test stage)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: test
+          build-args: HTTPD_VERSION=${{ matrix.httpd_version }}
+          push: false
+          cache-from: type=gha,scope=httpd-${{ matrix.httpd_version }}
+          cache-to: type=gha,mode=max,scope=httpd-${{ matrix.httpd_version }}
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: final
+          build-args: HTTPD_VERSION=${{ matrix.httpd_version }}
+          push: false
+          load: true
+          tags: payloadshield-httpd:${{ matrix.httpd_version }}
+          cache-from: type=gha,scope=httpd-${{ matrix.httpd_version }}
+      - name: Smoke test
+        run: bash docker/smoke_test.sh payloadshield-httpd:${{ matrix.httpd_version }} ${{ matrix.httpd_version }}
