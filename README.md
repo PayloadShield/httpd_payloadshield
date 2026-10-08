@@ -21,6 +21,64 @@ sudo make install   # installs mod_payloadshield.so
 make test           # crypto unit tests (no Apache needed)
 ```
 
+## Docker installation
+
+Install Docker Engine or Docker Desktop and make sure the Docker daemon is running. The Docker image builds the Apache module, loads it in Apache, and listens on container port `8080`. PayloadShield processing is disabled until you add directives for the endpoint you want to protect.
+
+Build and start an image locally (replace the version with one from `docker/httpd-versions.json`):
+
+```sh
+VERSION=2.4.69
+docker build -f docker/Dockerfile --build-arg HTTPD_VERSION="$VERSION" --target final \
+  -t "payloadshield-httpd:$VERSION" .
+docker run -d --name payloadshield-httpd --restart unless-stopped \
+  -p 8080:8080 "payloadshield-httpd:$VERSION"
+```
+
+Check that Apache is serving requests:
+
+```sh
+curl http://localhost:8080/
+```
+
+To enable encryption for an endpoint, copy the image's Apache configuration and add a `<Location>` block. Keep the existing `LoadModule payloadshield_module` line in the copied configuration:
+
+```sh
+docker run --rm "payloadshield-httpd:$VERSION" \
+  cat /usr/local/apache2/conf/httpd.conf > httpd.conf
+```
+
+Add this block to `httpd.conf` and provide a 32-byte symmetric key in `server.key` (or its Base64 encoding):
+
+```apache
+<Location "/api">
+    PayloadShield On
+    PayloadShieldAlgorithm aes-gcm-256
+    PayloadShieldKey /etc/payloadshield/server.key
+    PayloadShieldMaxBodySize 10485760
+</Location>
+```
+
+Do not commit the key to source control. Validate the configuration, then start the container with the configuration and key mounted read-only:
+
+```sh
+docker run --rm \
+  -v "$PWD/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro" \
+  -v "$PWD/server.key:/etc/payloadshield/server.key:ro" \
+  "payloadshield-httpd:$VERSION" httpd -t
+
+docker rm -f payloadshield-httpd
+docker run -d --name payloadshield-httpd --restart unless-stopped \
+  -p 8080:8080 \
+  -v "$PWD/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro" \
+  -v "$PWD/server.key:/etc/payloadshield/server.key:ro" \
+  "payloadshield-httpd:$VERSION"
+```
+
+For a different algorithm, select `chacha20-poly1305` with its 32-byte key, or configure the role-specific PEM files for `rsa-hybrid` as described under [Configuration](#configuration). Use TLS in front of the container; payload encryption does not replace transport security.
+
+To build all listed versions, run the crypto unit tests, and smoke-test the images, use `bash docker/build.sh`. The deployment scripts (`./deploy.sh` on Linux/macOS or `deploy.bat` on Windows) start a container for each listed version on consecutive host ports beginning at `HOST_PORT` (default `8080`). They pull tags from `IMAGE_REPOSITORY` (default `kanduganesh/payloadshield-httpd`); if a tag is missing, they build it and push it to that registry. Set `IMAGE_REPOSITORY`, `CONTAINER_NAME`, and `HOST_PORT` as needed before deployment.
+
 ## Configuration
 
 ```apache
