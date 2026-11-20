@@ -19,7 +19,7 @@ for version in $VERSIONS; do
     --build-arg "HTTPD_VERSION=$version" \
     --target final \
     -t "payloadshield-httpd:$version" .
-  module_file="dist/$version/mod_payloadshield.so"
+  module_file="dist/mod_payloadshield_$version.so"
   if [ ! -f "$module_file" ]; then
     mkdir -p "$(dirname "$module_file")"
     container_id=$(docker create "payloadshield-httpd:$version")
